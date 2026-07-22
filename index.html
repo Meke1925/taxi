@@ -54,7 +54,7 @@ window.onload = function() {
     fetchRealLocation(false);
 };
 
-// 🌍 1. 【通信バグ完全解決版】世界中どこでも本物のデータを取得
+// 🌍 1. 無料のパブリック検索APIから本物の座標を取得する処理
 function fetchRealLocation(isExpired) {
     const input = document.getElementById("destinationInput").value;
     const statusLabel = document.getElementById("statusLabel");
@@ -62,30 +62,30 @@ function fetchRealLocation(isExpired) {
     if (!input.trim()) return;
     statusLabel.innerText = "🔍 Searching real location...";
 
-    // 🔒 修正完了：正しいNominatim APIのエンドポイントURLにし、$ マークもしっかり付与
-    const targetUrl = `https://openstreetmap.org{encodeURIComponent(input)}&format=json&limit=1&addressdetails=0`;
+    // 🔒 修正：検索専用のNominatim APIエンドポイントへ完全書き換え
+    const targetUrl = "https://openstreetmap.org" + encodeURIComponent(input) + "&format=json&limit=1&addressdetails=0";
 
     fetch(targetUrl, {
         method: "GET",
         mode: "cors",
         headers: {
-            "Accept": "application/json"
+            "Accept": "application/json",
+            // 💡 利用規約によるアクセスブロックを回避するための識別用ヘッダー
+            "User-Agent": "TaxiRouteShareApp/1.0"
         }
     })
-    .then(response => {
-        if (!response.ok) throw new Error("Network response was not ok");
+    .then(function(response) {
+        if (!response.ok) throw new Error("Network error");
         return response.json();
     })
-    .then(data => {
+    .then(function(data) {
         let locationData = { name: input, lat: "---", lng: "---" };
 
         if (data && data.length > 0) {
-            const target = data[0]; // 最初の検索結果を取得
-            
+            const target = data[0]; // 1番最初の検索結果を取得
             locationData.lat = parseFloat(target.lat).toFixed(4);
             locationData.lng = parseFloat(target.lon).toFixed(4);
             
-            // 住所を綺麗に整形（カンマ区切りの最初の2つを結合）
             const parts = target.display_name.split(',');
             locationData.name = parts.slice(0, 2).join(', ').trim();
             statusLabel.innerText = "✅ Location verified!";
@@ -94,14 +94,14 @@ function fetchRealLocation(isExpired) {
         }
         drawTaxiSheet(locationData, isExpired);
     })
-    .catch(error => {
+    .catch(function(error) {
         statusLabel.innerText = "⚠️ Network busy. Please try again.";
         console.error(error);
         drawTaxiSheet({ name: input, lat: "---", lng: "---" }, isExpired);
     });
 }
 
-// 🎨 2. キャンバスへの正確なリアルタイム描画
+// 🎨 2. キャンバスへのリアルタイム描画処理
 function drawTaxiSheet(locationData, isExpired) {
     let selectedLang = document.getElementById("langSelect").value;
     if (selectedLang === "auto") {
@@ -109,9 +109,8 @@ function drawTaxiSheet(locationData, isExpired) {
         selectedLang = ["en", "zh", "ko", "ja"].includes(browserLang) ? browserLang : "en";
     }
 
-    const latlngStr = `${locationData.lat}, ${locationData.lng}`;
+    const latlngStr = locationData.lat + ", " + locationData.lng;
     
-    // 安全に2日後の日付を計算（月末バグ防止）
     const now = new Date();
     now.setDate(now.getDate() + 2); 
     const expireStr = now.getFullYear() + "/" + String(now.getMonth() + 1).padStart(2, '0') + "/" + String(now.getDate()).padStart(2, '0');
@@ -128,7 +127,7 @@ function drawTaxiSheet(locationData, isExpired) {
     ctx.fillStyle = "#ff4757"; ctx.font = "bold 20px Arial, sans-serif"; ctx.textAlign = "center";
     ctx.fillText("⚠️ 運転手さんへ (FOR DRIVER)", 200, 50);
 
-    // 目的地の描画（Canvas上の描画幅で安全に自動折り返し）
+    // 目的地の自動折り返し
     ctx.fillStyle = "#1e272e"; ctx.font = "bold 14px Arial, sans-serif"; ctx.textAlign = "left";
     let nameText = "📍 目的地: " + locationData.name;
     
@@ -162,7 +161,7 @@ function drawTaxiSheet(locationData, isExpired) {
     ctx.fillStyle = "#f1f2f6"; ctx.fillRect(mapX, mapY, mapW, mapH);
     ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 4;
     for(let i = 20; i < mapW; i += 30) {
-        ctx.beginPath(); ctx.moveTo(mapX + i, mapY); ctx.lineTo(mapX + i, mapY + mapH); ctx.stroke(); // 💡 修正完了
+        ctx.beginPath(); ctx.moveTo(mapX + i, mapY); ctx.lineTo(mapX + i, mapY + mapH); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(mapX, mapY + i); ctx.lineTo(mapX + mapW, mapY + i); ctx.stroke();
     }
     ctx.fillStyle = "#ff4757"; ctx.beginPath(); ctx.arc(mapX + 70, mapY + 70, 8, 0, Math.PI * 2); ctx.fill();
@@ -178,19 +177,15 @@ function drawTaxiSheet(locationData, isExpired) {
     ctx.fillRect(qrX + 60, qrY + 60, 20, 20); ctx.fillRect(qrX + 80, qrY + 80, 20, 20); ctx.fillRect(qrX + 60, qrY + 100, 20, 20);
 
     ctx.fillStyle = "#718093"; ctx.font = "12px Arial, sans-serif"; ctx.textAlign = "center";
-    ctx.fillText(`Map (${selectedLang.toUpperCase()})`, 100, 440);
+    ctx.fillText("Map (" + selectedLang.toUpperCase() + ")", 100, 440);
     ctx.fillText("Driver QR", 300, 440);
 
-    // 🔒 タイムアウト目隠し（💡 完全復元完了）
+    // 🔒 タイムアウト目隠し（💡 末尾まで完全に復元）
     if (isExpired) {
-        ctx.fillStyle = "rgba(47, 53, 66, 0.96)"; 
-        ctx.fillRect(20, 75, 360, 375);
-        ctx.fillStyle = "#ffffff"; 
-        ctx.font = "bold 16px Arial, sans-serif"; 
-        ctx.textAlign = "center";
+        ctx.fillStyle = "rgba(47, 53, 66, 0.96)"; ctx.fillRect(20, 75, 360, 375);
+        ctx.fillStyle = "#ffffff"; ctx.font = "bold 16px Arial, sans-serif"; ctx.textAlign = "center";
         ctx.fillText("🔒 EXPIRED / 失効しました", 200, 240);
-        ctx.font = "12px Arial, sans-serif";
-        ctx.fillStyle = "#a4b0be";
+        ctx.font = "12px Arial, sans-serif"; ctx.fillStyle = "#a4b0be";
         ctx.fillText("This ticket is no longer available.", 200, 270);
     }
 
@@ -201,7 +196,9 @@ function drawTaxiSheet(locationData, isExpired) {
         const finalImageUrl = canvas.toDataURL("image/png");
         document.getElementById("downloadBtn").href = finalImageUrl;
         document.getElementById("downloadBtn").style.display = "inline-block";
-    } catch (e) {}
+    } catch (e) {
+        console.error(e);
+    }
 }
 </script>
 </body>
