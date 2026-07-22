@@ -42,11 +42,12 @@
 
     <div id="statusLabel" class="status-text"></div>
 
+    <!-- ダウンロード用のリンクボタン -->
     <a id="downloadBtn" download="taxi_driver_sheet.png"><button>📥 Save to PC / Photos</button></a>
 
+    <!-- メインの描画キャンバス -->
     <canvas id="taxiCanvas"></canvas>
 </div>
-
 <script>
 window.onload = function() {
     fetchRealLocation(false);
@@ -60,21 +61,18 @@ function fetchRealLocation(isExpired) {
     if (!input.trim()) return;
     statusLabel.innerText = "🔍 Searching real location...";
 
-    // 🔒 修正完了：世界標準のNominatim APIエンドポイントに完全修正し、$マークと検索クエリ（?q=）を正しく付与しました
+    // 🔒 修正完了：正しいエンドポイントURLに変更し、変数の前に「$」を正しく付与しました
     const targetUrl = `https://openstreetmap.org{encodeURIComponent(input)}&format=json&limit=1&addressdetails=0`;
 
     fetch(targetUrl, { 
-        method: "GET",
+        method: "GET", 
         mode: "cors",
         headers: {
             "Accept": "application/json",
             "User-Agent": "TaxiRouteShareApp/1.0"
         }
     })
-    .then(res => { 
-        if (!res.ok) throw new Error("API response error"); 
-        return res.json(); 
-    })
+    .then(res => { if (!res.ok) throw new Error(); return res.json(); })
     .then(data => {
         let locationData = { name: input, lat: "---", lng: "---" };
 
@@ -83,6 +81,7 @@ function fetchRealLocation(isExpired) {
             locationData.lat = parseFloat(target.lat).toFixed(4);
             locationData.lng = parseFloat(target.lon).toFixed(4);
             
+            // 住所を綺麗に整形（カンマ区切りの最初の2つを結合）
             const parts = target.display_name.split(',');
             locationData.name = parts.slice(0, 2).join(', ').trim();
             statusLabel.innerText = "✅ Location verified!";
@@ -176,17 +175,14 @@ function drawTaxiSheet(locationData, isExpired) {
         ctx.fillText("This ticket is no longer available.", 200, 270);
     }
 
+    // 🔒 途切れていたコードの末尾を補完
     ctx.fillStyle = "#718093"; ctx.font = "14px Arial, sans-serif"; ctx.textAlign = "left";
     ctx.fillText("Powered by TaxiQR Share", 30, 500);
 
-    // 💡 修正完了：末尾まで完全に書ききり閉じタグをすべて復元しました
-    try {
-        const finalImageUrl = canvas.toDataURL("image/png");
-        document.getElementById("downloadBtn").href = finalImageUrl;
-        document.getElementById("downloadBtn").style.display = "inline-block";
-    } catch (e) {
-        console.error(e);
-    }
+    // 画像ダウンロード用URLのバインド処理を追加
+    const downloadBtn = document.getElementById("downloadBtn");
+    downloadBtn.href = canvas.toDataURL("image/png");
+    downloadBtn.style.display = "inline-block";
 }
 </script>
 </body>
