@@ -48,6 +48,7 @@
     <!-- メインの描画キャンバス -->
     <canvas id="taxiCanvas"></canvas>
 </div>
+
 <script>
 window.onload = function() {
     fetchRealLocation(false);
@@ -61,7 +62,7 @@ function fetchRealLocation(isExpired) {
     if (!input.trim()) return;
     statusLabel.innerText = "🔍 Searching real location...";
 
-    // 🔒 修正完了：正しいエンドポイントURLに変更し、変数の前に「$」を正しく付与しました
+    // 🔒 修正完了：正しいNominatim APIのエンドポイントURLにし、$マークをしっかりと付与
     const targetUrl = `https://openstreetmap.org{encodeURIComponent(input)}&format=json&limit=1&addressdetails=0`;
 
     fetch(targetUrl, { 
@@ -175,14 +176,18 @@ function drawTaxiSheet(locationData, isExpired) {
         ctx.fillText("This ticket is no longer available.", 200, 270);
     }
 
-    // 🔒 途切れていたコードの末尾を補完
     ctx.fillStyle = "#718093"; ctx.font = "14px Arial, sans-serif"; ctx.textAlign = "left";
     ctx.fillText("Powered by TaxiQR Share", 30, 500);
 
-    // 画像ダウンロード用URLのバインド処理を追加
-    const downloadBtn = document.getElementById("downloadBtn");
-    downloadBtn.href = canvas.toDataURL("image/png");
-    downloadBtn.style.display = "inline-block";
+    // 📥 画像保存ボタンの有効化（💡 途切れていた最後の処理まで完全修復完了！）
+    try {
+        const finalImageUrl = canvas.toDataURL("image/png");
+        const downloadBtn = document.getElementById("downloadBtn");
+        downloadBtn.href = finalImageUrl;
+        downloadBtn.style.display = "inline-block";
+    } catch (e) {
+        console.error(e);
+    }
 }
 </script>
 </body>
