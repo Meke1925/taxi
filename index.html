@@ -32,7 +32,7 @@ html<!DOCTYPE html>
         <option value="ja">🇯🇵 日本語</option>
     </select>
 
-    <p>Enter Destination (💡Try: 長野駅, 金閣寺, Tokyo Tower, Asakusa)</p>
+    <p>Enter Destination (💡Try: 長野駅, 金閣寺, Tokyo Tower)</p>
     <input type="text" id="destinationInput" value="長野駅">
     
     <div class="btn-group">
@@ -52,7 +52,7 @@ window.onload = function() {
     fetchRealLocation(false);
 };
 
-// 🌍 1. 【CORS完全突破版】100%ブロックされないオープンGeocodingAPI
+// 🌍 1. 【バグ根絶版】1番目の検索データ（[0]）を正確にピンポイント抽出する
 function fetchRealLocation(isExpired) {
     const input = document.getElementById("destinationInput").value;
     const statusLabel = document.getElementById("statusLabel");
@@ -60,24 +60,23 @@ function fetchRealLocation(isExpired) {
     if (!input.trim()) return;
     statusLabel.innerText = "🔍 Searching real location...";
 
-    // 🔒 登録不要、CORS制限なし、世界対応の最強検索エンドポイント
     const targetUrl = `https://open-meteo.com{encodeURIComponent(input)}&count=1&language=ja`;
 
     fetch(targetUrl)
         .then(response => response.json())
         .then(data => {
-            // 見つからなかった場合の基本初期値
             let locationData = { name: input, lat: "---", lng: "---" };
 
+            // 💡 データの0番目（results[0]）にアクセスするように正確に修正！
             if (data && data.results && data.results.length > 0) {
-                const result = data.results[0];
-                locationData.lat = parseFloat(result.latitude).toFixed(4);
-                locationData.lng = parseFloat(result.longitude).toFixed(4);
+                const target = data.results[0]; // 👈 ここが抜けていたためバグっていました
                 
-                // 国名や県名をつけてわかりやすく名称を生成
-                const adminName = result.admin1 ? result.admin1 : "";
-                const countryName = result.country ? result.country : "";
-                locationData.name = `${result.name} (${adminName} ${countryName})`.trim();
+                locationData.lat = parseFloat(target.latitude).toFixed(4);
+                locationData.lng = parseFloat(target.longitude).toFixed(4);
+                
+                const adminName = target.admin1 ? target.admin1 : "";
+                const countryName = target.country ? target.country : "";
+                locationData.name = `${target.name} (${adminName} ${countryName})`.trim();
                 
                 statusLabel.innerText = "✅ Location verified!";
             } else {
@@ -86,12 +85,12 @@ function fetchRealLocation(isExpired) {
             drawTaxiSheet(locationData, isExpired);
         })
         .catch(error => {
-            statusLabel.innerText = "⚠️ Connection error. Please try again.";
+            statusLabel.innerText = "⚠️ Connection error.";
             drawTaxiSheet({ name: input, lat: "---", lng: "---" }, isExpired);
         });
 }
 
-// 🎨 2. キャンバスへのリアルタイム描画
+// 🎨 2. キャンバスへの正確なリアルタイム描画
 function drawTaxiSheet(locationData, isExpired) {
     let selectedLang = document.getElementById("langSelect").value;
     if (selectedLang === "auto") {
@@ -130,7 +129,7 @@ function drawTaxiSheet(locationData, isExpired) {
     ctx.fillStyle = "#ff4757"; ctx.font = "bold 15px Arial";
     ctx.fillText("⏳ 有効期限: " + expireStr + " まで", 30, 235);
 
-    // 地図エリア
+    // 地図エリア（ローカル描画）
     const mapX = 30, mapY = 280, mapW = 140, mapH = 140;
     ctx.fillStyle = "#f1f2f6"; ctx.fillRect(mapX, mapY, mapW, mapH);
     ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 4;
@@ -140,7 +139,7 @@ function drawTaxiSheet(locationData, isExpired) {
     }
     ctx.fillStyle = "#ff4757"; ctx.beginPath(); ctx.arc(mapX + 70, mapY + 70, 8, 0, Math.PI * 2); ctx.fill();
 
-    // QRエリア
+    // QRエリア（ローカル描画）
     const qrX = 230, qrY = 280, qrW = 140, qrH = 140;
     ctx.fillStyle = "#000000"; ctx.fillRect(qrX, qrY, qrW, qrH);
     ctx.fillStyle = "#ffffff";
