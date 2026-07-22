@@ -15,7 +15,7 @@
         #downloadBtn { display: none; margin-top: 15px; text-decoration: none; }
         #downloadBtn button { width: 100%; color: white; font-size: 16px; background: #007bff; padding: 12px 30px; }
         #taxiCanvas { max-width: 100%; border: 2px solid #ccc; border-radius: 10px; margin-top: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); background: #fff; }
-        .status-text { font-size: 12px; color: #007bff; font-weight: bold; margin: 5px 0; height: 15px; }
+        .status-text { font-size: 13px; color: #007bff; font-weight: bold; margin: 5px 0; min-height: 20px; line-height: 1.4; word-break: break-all; }
     </style>
 </head>
 <body>
@@ -40,12 +40,11 @@
         <button class="btn-timeout" onclick="fetchRealLocation(true)">❌ Test Timeout</button>
     </div>
 
+    <!-- 💡 エラー内容がここに詳しく表示されます -->
     <div id="statusLabel" class="status-text"></div>
 
-    <!-- ダウンロード用のリンクボタン -->
     <a id="downloadBtn" download="taxi_driver_sheet.png"><button>📥 Save to PC / Photos</button></a>
 
-    <!-- メインの描画キャンバス -->
     <canvas id="taxiCanvas"></canvas>
 </div>
 
@@ -54,54 +53,59 @@ window.onload = function() {
     fetchRealLocation(false);
 };
 
-// 🌍 1. 無料のパブリック検索APIから本物の座標を取得する処理
 function fetchRealLocation(isExpired) {
     const input = document.getElementById("destinationInput").value;
     const statusLabel = document.getElementById("statusLabel");
     
     if (!input.trim()) return;
+    statusLabel.style.color = "#007bff";
     statusLabel.innerText = "🔍 Searching real location...";
 
-    // 🔒 修正：検索専用のNominatim APIエンドポイントへ完全書き換え
-    const targetUrl = "https://openstreetmap.org" + encodeURIComponent(input) + "&format=json&limit=1&addressdetails=0";
+    // 🔒 確実につなぐためのURL文字列結合
+    const baseUrl = "https://openstreetmap.org";
+    const targetUrl = baseUrl + "?q=" + encodeURIComponent(input) + "&format=json&limit=1&addressdetails=0";
 
     fetch(targetUrl, {
         method: "GET",
         mode: "cors",
         headers: {
             "Accept": "application/json",
-            // 💡 利用規約によるアクセスブロックを回避するための識別用ヘッダー
-            "User-Agent": "TaxiRouteShareApp/1.0"
+            "User-Agent": "TaxiRouteShareTestingApp/1.0"
         }
     })
     .then(function(response) {
-        if (!response.ok) throw new Error("Network error");
+        if (!response.ok) {
+            throw new Error("サーバーがエラーを返しました (HTTP " + response.status + ")");
+        }
         return response.json();
     })
     .then(function(data) {
         let locationData = { name: input, lat: "---", lng: "---" };
 
         if (data && data.length > 0) {
-            const target = data[0]; // 1番最初の検索結果を取得
+            const target = data[0];
             locationData.lat = parseFloat(target.lat).toFixed(4);
             locationData.lng = parseFloat(target.lon).toFixed(4);
             
             const parts = target.display_name.split(',');
             locationData.name = parts.slice(0, 2).join(', ').trim();
+            statusLabel.style.color = "#28a745";
             statusLabel.innerText = "✅ Location verified!";
         } else {
-            statusLabel.innerText = "❌ Not found. Please type another name.";
+            statusLabel.style.color = "#dc3545";
+            statusLabel.innerText = "❌ 検索結果が0件です。別の地名を入力してください。";
         }
         drawTaxiSheet(locationData, isExpired);
     })
     .catch(function(error) {
-        statusLabel.innerText = "⚠️ Network busy. Please try again.";
-        console.error(error);
+        // 💡 通信がブロックされた場合、ここにエラー理由が表示されます
+        statusLabel.style.color = "#dc3545";
+        statusLabel.innerText = "⚠️ エラー発生: " + error.message + " (ブラウザやセキュリティ等で外部API通信がブロックされている可能性があります)";
+        console.error("Debug Error:", error);
         drawTaxiSheet({ name: input, lat: "---", lng: "---" }, isExpired);
     });
 }
 
-// 🎨 2. キャンバスへのリアルタイム描画処理
 function drawTaxiSheet(locationData, isExpired) {
     let selectedLang = document.getElementById("langSelect").value;
     if (selectedLang === "auto") {
@@ -120,14 +124,12 @@ function drawTaxiSheet(locationData, isExpired) {
     canvas.width = 400; canvas.height = 540;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 背景と赤枠
     ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.strokeStyle = "#ff4757"; ctx.lineWidth = 8; ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
 
     ctx.fillStyle = "#ff4757"; ctx.font = "bold 20px Arial, sans-serif"; ctx.textAlign = "center";
     ctx.fillText("⚠️ 運転手さんへ (FOR DRIVER)", 200, 50);
 
-    // 目的地の自動折り返し
     ctx.fillStyle = "#1e272e"; ctx.font = "bold 14px Arial, sans-serif"; ctx.textAlign = "left";
     let nameText = "📍 目的地: " + locationData.name;
     
@@ -156,7 +158,6 @@ function drawTaxiSheet(locationData, isExpired) {
     ctx.fillStyle = "#ff4757"; ctx.font = "bold 15px Arial, sans-serif";
     ctx.fillText("⏳ 有効期限: " + expireStr + " まで", 30, 235);
 
-    // 地図エリア（ローカル描画）
     const mapX = 30, mapY = 280, mapW = 140, mapH = 140;
     ctx.fillStyle = "#f1f2f6"; ctx.fillRect(mapX, mapY, mapW, mapH);
     ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 4;
@@ -166,7 +167,6 @@ function drawTaxiSheet(locationData, isExpired) {
     }
     ctx.fillStyle = "#ff4757"; ctx.beginPath(); ctx.arc(mapX + 70, mapY + 70, 8, 0, Math.PI * 2); ctx.fill();
 
-    // QRエリア（ローカル描画）
     const qrX = 230, qrY = 280, qrW = 140, qrH = 140;
     ctx.fillStyle = "#000000"; ctx.fillRect(qrX, qrY, qrW, qrH);
     ctx.fillStyle = "#ffffff";
@@ -180,7 +180,6 @@ function drawTaxiSheet(locationData, isExpired) {
     ctx.fillText("Map (" + selectedLang.toUpperCase() + ")", 100, 440);
     ctx.fillText("Driver QR", 300, 440);
 
-    // 🔒 タイムアウト目隠し（💡 末尾まで完全に復元）
     if (isExpired) {
         ctx.fillStyle = "rgba(47, 53, 66, 0.96)"; ctx.fillRect(20, 75, 360, 375);
         ctx.fillStyle = "#ffffff"; ctx.font = "bold 16px Arial, sans-serif"; ctx.textAlign = "center";
