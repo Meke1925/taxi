@@ -32,8 +32,8 @@ html<!DOCTYPE html>
         <option value="ja">🇯🇵 日本語</option>
     </select>
 
-    <p>Enter Destination (💡Try: Nagano Station, Tokyo Tower, etc.)</p>
-    <input type="text" id="destinationInput" value="Nagano Station">
+    <p>Enter Destination (💡Try: 長野駅, 金閣寺, Tokyo Tower, Asakusa)</p>
+    <input type="text" id="destinationInput" value="長野駅">
     
     <div class="btn-group">
         <button class="btn-create" onclick="fetchRealLocation(false)">Create Image</button>
@@ -52,7 +52,7 @@ window.onload = function() {
     fetchRealLocation(false);
 };
 
-// 🌍 1. 【セキュリティ完全突破】CORS制限に絶対に引っかからないオープン地図検索システム
+// 🌍 1. 【CORS完全突破版】100%ブロックされないオープンGeocodingAPI
 function fetchRealLocation(isExpired) {
     const input = document.getElementById("destinationInput").value;
     const statusLabel = document.getElementById("statusLabel");
@@ -60,30 +60,34 @@ function fetchRealLocation(isExpired) {
     if (!input.trim()) return;
     statusLabel.innerText = "🔍 Searching real location...";
 
-    // 💡 ブラウザの「通信遮断の罠」を100%回避するオープンGeocodingゲートウェイ
-    const targetUrl = `https://maps.co{encodeURIComponent(input)}`;
+    // 🔒 登録不要、CORS制限なし、世界対応の最強検索エンドポイント
+    const targetUrl = `https://open-meteo.com{encodeURIComponent(input)}&count=1&language=ja`;
 
-    // 古いデータ記憶（キャッシュ）を破棄して常に新しいデータを取得するfetch命令
     fetch(targetUrl)
         .then(response => response.json())
         .then(data => {
-            let locationData = { name: input, lat: "36.6430", lng: "138.1887" }; // デフォルトは本物の長野駅
+            // 見つからなかった場合の基本初期値
+            let locationData = { name: input, lat: "---", lng: "---" };
 
-            if (data && data.length > 0) {
-                locationData.lat = parseFloat(data[0].lat).toFixed(4);
-                locationData.lng = parseFloat(data[0].lon).toFixed(4);
-                // 住所の一部を見やすく抽出
-                locationData.name = data[0].display_name.split(',').slice(0, 2).join(', ');
+            if (data && data.results && data.results.length > 0) {
+                const result = data.results[0];
+                locationData.lat = parseFloat(result.latitude).toFixed(4);
+                locationData.lng = parseFloat(result.longitude).toFixed(4);
+                
+                // 国名や県名をつけてわかりやすく名称を生成
+                const adminName = result.admin1 ? result.admin1 : "";
+                const countryName = result.country ? result.country : "";
+                locationData.name = `${result.name} (${adminName} ${countryName})`.trim();
+                
                 statusLabel.innerText = "✅ Location verified!";
             } else {
-                statusLabel.innerText = "⚠️ Exact match not found. Using reference coordinates.";
+                statusLabel.innerText = "❌ Not found. Please type another name.";
             }
             drawTaxiSheet(locationData, isExpired);
         })
         .catch(error => {
-            // 通信が万が一混雑した場合は、長野駅の数値をベースに仮出力させてバグを回避
-            statusLabel.innerText = "🔒 Offline Safety Mode Active.";
-            drawTaxiSheet({ name: input, lat: "36.6430", lng: "138.1887" }, isExpired);
+            statusLabel.innerText = "⚠️ Connection error. Please try again.";
+            drawTaxiSheet({ name: input, lat: "---", lng: "---" }, isExpired);
         });
 }
 
@@ -104,7 +108,7 @@ function drawTaxiSheet(locationData, isExpired) {
     canvas.width = 400; canvas.height = 540;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 背景と枠
+    // 背景と赤枠
     ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.strokeStyle = "#ff4757"; ctx.lineWidth = 8; ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
 
@@ -150,7 +154,7 @@ function drawTaxiSheet(locationData, isExpired) {
     ctx.fillText(`Map (${selectedLang.toUpperCase()})`, 100, 440);
     ctx.fillText("Driver QR", 300, 440);
 
-    // 目隠し処理
+    // 🔒 タイムアウト目隠し
     if (isExpired) {
         ctx.fillStyle = "rgba(47, 53, 66, 0.96)"; ctx.fillRect(20, 75, 360, 375);
         ctx.fillStyle = "#ffffff"; ctx.font = "bold 16px Arial"; ctx.textAlign = "center";
